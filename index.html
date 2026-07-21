@@ -31,7 +31,10 @@
         <button data-place="experience">Experience</button>
         <button data-place="contact">Contact</button>
       </nav>
-      <button class="sound-button" id="sound" aria-label="Toggle sound"><span>Sound</span><i></i><i></i><i></i></button>
+      <div class="topbar-actions">
+        <button class="map-toggle" id="map-toggle" aria-label="Show city map">Map</button>
+        <button class="sound-button" id="sound" aria-label="Toggle sound"><span>Sound</span><i></i><i></i><i></i></button>
+      </div>
     </header>
 
     <aside class="hud intro-card" id="intro-card">
@@ -52,6 +55,15 @@
     <section class="panel" id="panel" aria-hidden="true">
       <button class="panel-close" id="panel-close" aria-label="Close panel">×</button>
       <div class="panel-content" id="panel-content"></div>
+    </section>
+
+    <section class="map-overview" id="map-overview" aria-hidden="true">
+      <div class="map-card">
+        <div class="map-card-head"><div><p class="map-eyebrow">City overview</p><h2>Portfolio map</h2></div><button id="map-close" aria-label="Close city map">×</button></div>
+        <canvas id="map-canvas" aria-label="2D overview of the portfolio city"></canvas>
+        <div class="map-legend" aria-label="Map legend"><span><i class="legend-player"></i> Kendaraan kamu</span><span><i class="legend-point"></i> Point of interest</span><span><i class="legend-fountain"></i> Central fountain</span></div>
+        <p class="map-hint">Klik bangunan untuk berpindah ke lokasinya · tutup map untuk kembali berkendara.</p>
+      </div>
     </section>
 
     <noscript>This interactive portfolio requires JavaScript.</noscript>
