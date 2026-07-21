@@ -1,0 +1,12 @@
+{
+  "name": "dimas-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx --yes serve .",
+    "start": "npx --yes serve ."
+  },
+  "dependencies": {
+    "three": "^0.179.1"
+  }
+}

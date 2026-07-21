@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <meta name="description" content="Explore the interactive 3D portfolio of Dimas Al Gazali, frontend and full-stack developer." />
+    <meta name="theme-color" content="#bfe8ff" />
+    <title>Dimas Al Gazali — Interactive Portfolio</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="credit.css" />
+  </head>
+  <body>
+    <div id="loading" class="loading">
+      <div class="loading-mark">D<span>.</span></div>
+      <div class="loading-copy"><strong>Building the world</strong><span id="loading-status">Starting engine…</span></div>
+      <div class="loading-bar"><i id="loading-progress"></i></div>
+    </div>
+
+    <canvas id="world" aria-label="Interactive 3D portfolio world"></canvas>
+
+    <header class="hud topbar">
+      <a class="brand" href="#" data-place="home" aria-label="Go to home">DIMAS<span>.</span></a>
+      <nav aria-label="Portfolio navigation">
+        <button data-place="about">About</button>
+        <button data-place="projects">Projects</button>
+        <button data-place="experience">Experience</button>
+        <button data-place="contact">Contact</button>
+      </nav>
+      <button class="sound-button" id="sound" aria-label="Toggle sound"><span>Sound</span><i></i><i></i><i></i></button>
+    </header>
+
+    <aside class="hud intro-card" id="intro-card">
+      <p class="eyebrow"><i></i> Available for junior roles</p>
+      <h1>Hi, I’m Dimas.<br /><span>I build for the web.</span></h1>
+      <p>Drive around to explore my work, background, and the tools I use.</p>
+      <button class="primary-action" id="start-driving">Start exploring <span>→</span></button>
+    </aside>
+
+    <div class="hud controls" id="controls">
+      <div class="key-grid" aria-hidden="true"><i></i><kbd>W</kbd><i></i><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
+      <div><strong>Drive</strong><span>WASD or arrow keys</span></div>
+      <div class="control-divider"></div>
+      <div><strong>Explore</strong><span>Drive into a marked area</span></div>
+      <div class="control-divider"></div>
+      <div><strong>Camera</strong><span>Drag to orbit · scroll to zoom</span></div>
+      <div class="control-divider"></div>
+      <div><strong>Action</strong><span>B brake · Space jump</span></div>
+    </div>
+
+    <div class="hud mobile-drive" id="mobile-drive" aria-label="Driving controls">
+      <button data-drive="left" aria-label="Turn left">←</button>
+      <div><button data-drive="forward" aria-label="Drive forward">↑</button><button data-drive="backward" aria-label="Drive backward">↓</button></div>
+      <button data-drive="right" aria-label="Turn right">→</button>
+    </div>
+
+    <button class="hud explore-prompt" id="explore-prompt">Open <strong></strong><span>↗</span></button>
+    <button class="hud reset-car" id="reset-car" aria-label="Reset car">↻ <span>Reset car</span></button>
+    <a class="hud model-credit" href="https://sketchfab.com/3d-models/2023-bmw-m3-g81-touring-cbf4f691cabc4dee9e3740e16b7ab8ee" target="_blank" rel="noreferrer">BMW model by Galaxy Car Showroom · CC BY</a>
+
+    <section class="panel" id="panel" aria-hidden="true">
+      <button class="panel-close" id="panel-close" aria-label="Close panel">×</button>
+      <div class="panel-content" id="panel-content"></div>
+    </section>
+
+    <div class="rotate-device"><span>↻</span><strong>Rotate your phone</strong><p>The 3D world is better in landscape.</p></div>
+    <noscript>This interactive portfolio requires JavaScript.</noscript>
+
+    <script>
+      window.addEventListener("error", function (event) {
+        const status = document.querySelector("#loading-status");
+        if (status) status.textContent = "Unable to load 3D engine. Check your connection and refresh.";
+        console.error("Portfolio failed to start:", event.error || event.message);
+      });
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/addons/": "/node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="content.js"></script>
+    <script type="module" src="script.js"></script>
+  </body>
+</html>

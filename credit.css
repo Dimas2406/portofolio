@@ -1,0 +1,9 @@
+.model-credit {
+  left: 18px;
+  bottom: 18px;
+  color: rgba(12, 35, 64, .62);
+  text-decoration: none;
+  font-size: 9px;
+}
+.model-credit:hover { color: #1288ff; }
+@media (max-width: 800px) { .model-credit { display: none; } }
