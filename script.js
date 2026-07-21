@@ -172,8 +172,12 @@ shadow(car);
 // Replace the procedural fallback with the supplied BMW M3 Touring GLB.
 const fallbackCarParts = car.children.filter(child => child !== carShadow);
 const nativeBrakeMaterials = [];
-const nativeIndicatorMaterials = { left: [], right: [] };
+const nativeReverseMaterials = [];
+const nativeRearIndicatorMaterials = { left: [], right: [] };
 const nativeFrontIndicatorMaterials = { left: [], right: [] };
+let bmwModel = null;
+let bmwModelBaseY = 0;
+const wheelAssemblies = [];
 const modelFrontWheels = [];
 const modelAllWheels = [];
 function halfGeometry(source, side) {
@@ -197,6 +201,7 @@ function halfGeometry(source, side) {
 }
 new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
   const bmw = gltf.scene;
+  bmwModel = bmw;
   bmw.name = "BMW M3 Touring";
   const combinedRearLamps = [];
   const frontLampMeshes = [];
@@ -219,7 +224,7 @@ new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
   });
   const wheelCandidates=[];
   bmw.traverse(child=>{
-    if(!child.isMesh||!/^(Tire_|M_Rim)/i.test(child.name))return;
+    if(!child.isMesh||!/^(Tire_|Shared_Tire|M_Rim)/i.test(child.name))return;
     const center=child.getWorldPosition(new THREE.Vector3());
     car.worldToLocal(center);
     wheelCandidates.push({object:child,center});
@@ -248,8 +253,42 @@ new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
   box.setFromObject(bmw);
   const center = box.getCenter(new THREE.Vector3());
   bmw.position.set(-center.x, -box.min.y, -center.z);
+  bmwModelBaseY = bmw.position.y;
   car.add(bmw);
   car.updateMatrixWorld(true);
+
+  const assemblyMap = new Map();
+  modelAllWheels.forEach(wheel => {
+    const point = car.worldToLocal(wheel.object.getWorldPosition(new THREE.Vector3()));
+    const key = `${wheel.front ? "front" : "rear"}-${point.x < 0 ? "left" : "right"}`;
+    let assembly = assemblyMap.get(key);
+    if (!assembly) {
+      const group = new THREE.Group();
+      group.name = `${key} wheel assembly`;
+      bmw.add(group);
+      assembly = { group, roots: new Set() };
+      assemblyMap.set(key, assembly);
+      wheelAssemblies.push(group);
+    }
+    let root = wheel.object;
+    while (root.parent && root.parent !== bmw) root = root.parent;
+    if (!assembly.roots.has(root)) {
+      assembly.roots.add(root);
+      assembly.group.attach(root);
+    }
+  });
+
+  [true, false].forEach(front => {
+    const axleWheels = modelAllWheels.filter(wheel => wheel.front === front && /^Tire_/i.test(wheel.object.name));
+    if (axleWheels.length !== 2) return;
+    const points = axleWheels.map(wheel => {
+      const point = wheel.object.getWorldPosition(new THREE.Vector3());
+      return car.worldToLocal(point);
+    });
+    const width = Math.abs(points[0].x - points[1].x) * .8;
+    const axle = mesh(new THREE.BoxGeometry(width, .12, .12), mat(0x090f16, .55, .15), 0, (points[0].y + points[1].y) / 2, (points[0].z + points[1].z) / 2);
+    car.add(axle);
+  });
 
   // Connect controls to the lamp meshes already built into the BMW model.
   bmw.traverse(child => {
@@ -268,14 +307,31 @@ new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
         return clone;
       });
       child.material = Array.isArray(child.material) ? headlightMaterials : headlightMaterials[0];
+      if (child.name.includes("InnerClear")) {
+        const accentSource = Array.isArray(child.material) ? child.material[0] : child.material;
+        const accentMaterial = accentSource.clone();
+        accentMaterial.color.set(0x32ff82);
+        accentMaterial.emissive = new THREE.Color(0x32ff82);
+        accentMaterial.emissiveIntensity = .75;
+        accentMaterial.toneMapped = false;
+        accentMaterial.transparent = true;
+        accentMaterial.opacity = .58;
+        const accent = new THREE.Mesh(child.geometry.clone(), accentMaterial);
+        accent.name = "Continuous green lamp accent";
+        accent.position.copy(child.position);
+        accent.rotation.copy(child.rotation);
+        accent.scale.copy(child.scale);
+        accent.renderOrder = child.renderOrder + 2;
+        child.parent.add(accent);
+      }
       frontLampMeshes.push({source:child,combined:Math.abs(lampCenter.x)<lampSize.x*.35});
       return;
     }
     if (lampCenter.z < .45) return;
-    const isBrakeLens = child.name.includes("OuterRed");
-    // Combined lamp meshes cross the center of the car and would illuminate both sides.
-    // Indicators only use factory meshes that live entirely on one side.
-    if (!isBrakeLens && Math.abs(lampCenter.x) < lampSize.x * .35) {
+    const isTurnLens = child.name.includes("OuterClear");
+    const isBrakeLens = child.name.includes("InnerClear");
+    const isReverseLens = child.name.includes("OuterRed");
+    if (isTurnLens && Math.abs(lampCenter.x) < lampSize.x * .35) {
       combinedRearLamps.push(child);
       return;
     }
@@ -286,11 +342,10 @@ new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
       material.emissive = new THREE.Color(0x000000);
       material.emissiveIntensity = 0;
       material.toneMapped = false;
-      if (isBrakeLens) nativeBrakeMaterials.push(material);
-      else {
-        const side = lampCenter.x < 0 ? "left" : "right";
-        nativeIndicatorMaterials[side].push(material);
-      }
+      if (isTurnLens) {
+        nativeRearIndicatorMaterials[lampCenter.x < 0 ? "left" : "right"].push(material);
+      } else if (isBrakeLens) nativeBrakeMaterials.push(material);
+      else if (isReverseLens) nativeReverseMaterials.push(material);
     });
   });
   combinedRearLamps.forEach(source => {
@@ -301,14 +356,14 @@ new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
       material.toneMapped = false;
       material.transparent = true;
       const half = new THREE.Mesh(halfGeometry(source.geometry, side), material);
-      half.name = `Native indicator ${side < 0 ? "left" : "right"}`;
+      half.name = `Native rear indicator ${side < 0 ? "left" : "right"}`;
       half.position.copy(source.position); half.rotation.copy(source.rotation); half.scale.copy(source.scale);
       half.renderOrder = source.renderOrder + 1;
       source.parent.add(half);
       car.updateMatrixWorld(true);
       const halfCenter = new THREE.Box3().setFromObject(half).getCenter(new THREE.Vector3());
       car.worldToLocal(halfCenter);
-      nativeIndicatorMaterials[halfCenter.x < 0 ? "left" : "right"].push(material);
+      nativeRearIndicatorMaterials[halfCenter.x < 0 ? "left" : "right"].push(material);
     });
   });
   frontLampMeshes.forEach(({source,combined}) => {
@@ -338,10 +393,10 @@ new GLTFLoader().load("assets/models/bmw-m3-touring.glb", gltf => {
 
 progress.style.width="76%";loadingStatus.textContent="Starting the car…";
 
-const keys={};let speed=0,steer=0,driving=false,currentZone=null,panelOpen=false;
+const keys={};let speed=0,steer=0,driving=false,currentZone=null,panelOpen=false,hazardOn=false,suspensionRaised=false,suspensionLift=0,landingSpring=0,landingSpringVelocity=0;
 let verticalVelocity=0;let jumpQueued=false;let suspensionImpact=0;const groundY=.18;
 const carVelocity=new THREE.Vector3();
-addEventListener("keydown",e=>{const key=e.key.toLowerCase();if(key===" "&&!keys[" "]){jumpQueued=true}keys[key]=true;if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(key))e.preventDefault();driving=true;intro.classList.add("hidden")});
+addEventListener("keydown",e=>{const key=e.key.toLowerCase();if(key===" "&&!keys[" "]){jumpQueued=true}if(key==="t"&&!keys.t)hazardOn=!hazardOn;if(key==="y"&&!keys.y)suspensionRaised=!suspensionRaised;keys[key]=true;if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(key))e.preventDefault();driving=true;intro.classList.add("hidden")});
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 let joystickPointerId=null;
 function setJoystickKeys(event){
@@ -368,7 +423,7 @@ joystickRing.addEventListener("pointermove",event=>{if(event.pointerId===joystic
 joystickRing.addEventListener("pointerup",releaseJoystick);
 joystickRing.addEventListener("pointercancel",releaseJoystick);
 
-function resetCar(){car.position.set(-6,groundY,6);car.rotation.set(0,0,0);speed=0;steer=0;verticalVelocity=0;jumpQueued=false;suspensionImpact=0;}
+function resetCar(){car.position.set(-6,groundY,6);car.rotation.set(0,0,0);speed=0;steer=0;verticalVelocity=0;jumpQueued=false;suspensionImpact=0;suspensionRaised=false;landingSpring=0;landingSpringVelocity=0;}
 document.querySelector("#reset-car").addEventListener("click",resetCar);
 document.querySelector("#start-driving").addEventListener("click",()=>{driving=true;intro.classList.add("hidden")});
 
@@ -407,14 +462,19 @@ canvas.addEventListener("pointercancel",()=>cameraDragging=false);
 canvas.addEventListener("wheel",event=>{event.preventDefault();cameraDistance=THREE.MathUtils.clamp(cameraDistance+event.deltaY*.007,7,18)},{passive:false});
 function updateCar(dt,time){
   if(panelOpen)return;
+  suspensionLift=THREE.MathUtils.lerp(suspensionLift,suspensionRaised?.48:0,1-Math.pow(.0008,dt));
+  landingSpringVelocity+=(-landingSpring*48-landingSpringVelocity*11)*dt;
+  landingSpring+=landingSpringVelocity*dt;
   const forward=keys.w||keys.arrowup,back=keys.s||keys.arrowdown,left=keys.a||keys.arrowleft,right=keys.d||keys.arrowright;
   const braking=keys.b||(back&&speed>.35)||(forward&&speed<-.35);
+  const hazard=hazardOn;
   const blinkOn=Math.sin(time*8)>0;
   nativeBrakeMaterials.forEach(material=>{material.emissive.set(0xff1000);material.emissiveIntensity=braking?4:.18});
-  nativeIndicatorMaterials.left.forEach(material=>{material.emissive.set(0xff7900);material.emissiveIntensity=left&&blinkOn?5:0});
-  nativeIndicatorMaterials.right.forEach(material=>{material.emissive.set(0xff7900);material.emissiveIntensity=right&&blinkOn?5:0});
-  nativeFrontIndicatorMaterials.left.forEach(material=>{material.emissiveIntensity=left&&blinkOn?6:0});
-  nativeFrontIndicatorMaterials.right.forEach(material=>{material.emissiveIntensity=right&&blinkOn?6:0});
+  nativeReverseMaterials.forEach(material=>{material.emissive.set(0xffffff);material.emissiveIntensity=back?4:0});
+  nativeRearIndicatorMaterials.left.forEach(material=>{material.emissiveIntensity=(left||hazard)&&blinkOn?5:0});
+  nativeRearIndicatorMaterials.right.forEach(material=>{material.emissiveIntensity=(right||hazard)&&blinkOn?5:0});
+  nativeFrontIndicatorMaterials.left.forEach(material=>{material.emissiveIntensity=(left||hazard)&&blinkOn?9:0});
+  nativeFrontIndicatorMaterials.right.forEach(material=>{material.emissiveIntensity=(right||hazard)&&blinkOn?9:0});
   const accel=forward?24:back?-15:0;
   if(keys.b) speed*=Math.pow(.78,dt*60);
   speed+=accel*dt;speed*=Math.pow(accel?0.988:0.91,dt*60);speed=THREE.MathUtils.clamp(speed,-9,21);
@@ -429,8 +489,15 @@ function updateCar(dt,time){
   if(!grounded||verticalVelocity>0){verticalVelocity-=14*dt;car.position.y+=verticalVelocity*dt;if(car.position.y<=groundY){car.position.y=groundY;verticalVelocity=0;}}
   else {jumpQueued=false;car.position.y=groundY+Math.sin(time*12)*Math.min(Math.abs(speed)*.0012,.012)}
   const airborne=Math.max(0,car.position.y-groundY);
-  if(wasAirborne&&airborne<=.001&&impactVelocity<0)suspensionImpact=THREE.MathUtils.clamp(Math.abs(impactVelocity)*.025,.06,.17);
+  if(wasAirborne&&airborne<=.001&&impactVelocity<0){
+    suspensionImpact=THREE.MathUtils.clamp(Math.abs(impactVelocity)*.025,.06,.17);
+    landingSpring=0;
+    landingSpringVelocity=-Math.min(1.2,Math.abs(impactVelocity)*.12);
+  }
   suspensionImpact=THREE.MathUtils.lerp(suspensionImpact,0,1-Math.pow(.035,dt));
+  const visualLift=suspensionLift+landingSpring;
+  if(bmwModel)bmwModel.position.y=bmwModelBaseY+visualLift;
+  if (bmwModel) wheelAssemblies.forEach(assembly => { assembly.position.y = -visualLift / bmwModel.scale.y; });
   car.rotation.x=THREE.MathUtils.lerp(car.rotation.x,airborne>.05?-verticalVelocity*.018:0,.12);car.rotation.z=THREE.MathUtils.lerp(car.rotation.z,-steer*Math.min(Math.abs(speed)*.006,.07),.12);
   wheels.forEach(w=>w.rotation.x-=speed*dt*1.9);
   modelFrontWheels.forEach(({object,baseQuaternion,verticalAxis})=>{
@@ -438,9 +505,7 @@ function updateCar(dt,time){
   });
   modelAllWheels.forEach(wheel=>{
     wheel.roll-=speed*dt*2.25;
-    const suspensionTarget=airborne>.02?-Math.min(.3,.075+airborne*.12):suspensionImpact;
-    wheel.suspensionOffset=THREE.MathUtils.lerp(wheel.suspensionOffset,suspensionTarget,1-Math.pow(airborne>.02?.055:.018,dt));
-    wheel.object.position.copy(wheel.basePosition).addScaledVector(wheel.verticalAxis,wheel.suspensionOffset/wheel.verticalScale);
+    wheel.suspensionOffset=0;
     const steering=wheel.object.userData.steeringRotation||new THREE.Quaternion();
     const rolling=new THREE.Quaternion().setFromAxisAngle(wheel.rollingAxis,wheel.roll);
     wheel.object.quaternion.copy(steering).multiply(rolling).multiply(wheel.baseQuaternion);
