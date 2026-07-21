@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="credit.css" />
+    <link rel="stylesheet" href="responsive.css" />
   </head>
   <body>
     <div id="loading" class="loading">
@@ -40,21 +41,8 @@
       <button class="primary-action" id="start-driving">Start exploring <span>→</span></button>
     </aside>
 
-    <div class="hud controls" id="controls">
-      <div class="key-grid" aria-hidden="true"><i></i><kbd>W</kbd><i></i><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
-      <div><strong>Drive</strong><span>WASD or arrow keys</span></div>
-      <div class="control-divider"></div>
-      <div><strong>Explore</strong><span>Drive into a marked area</span></div>
-      <div class="control-divider"></div>
-      <div><strong>Camera</strong><span>Drag to orbit · scroll to zoom</span></div>
-      <div class="control-divider"></div>
-      <div><strong>Action</strong><span>B brake · Space jump</span></div>
-    </div>
-
     <div class="hud mobile-drive" id="mobile-drive" aria-label="Driving controls">
-      <button data-drive="left" aria-label="Turn left">←</button>
-      <div><button data-drive="forward" aria-label="Drive forward">↑</button><button data-drive="backward" aria-label="Drive backward">↓</button></div>
-      <button data-drive="right" aria-label="Turn right">→</button>
+      <div class="joystick-ring"><div class="joystick-thumb"></div></div>
     </div>
 
     <button class="hud explore-prompt" id="explore-prompt">Open <strong></strong><span>↗</span></button>
@@ -66,7 +54,6 @@
       <div class="panel-content" id="panel-content"></div>
     </section>
 
-    <div class="rotate-device"><span>↻</span><strong>Rotate your phone</strong><p>The 3D world is better in landscape.</p></div>
     <noscript>This interactive portfolio requires JavaScript.</noscript>
 
     <script>

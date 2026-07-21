@@ -8,10 +8,12 @@ const loading = document.querySelector("#loading");
 const progress = document.querySelector("#loading-progress");
 const loadingStatus = document.querySelector("#loading-status");
 const intro = document.querySelector("#intro-card");
-const controlsHud = document.querySelector("#controls");
 const prompt = document.querySelector("#explore-prompt");
 const panel = document.querySelector("#panel");
 const panelContent = document.querySelector("#panel-content");
+const mobileDrive = document.querySelector("#mobile-drive");
+const joystickRing = mobileDrive.querySelector(".joystick-ring");
+const joystickThumb = mobileDrive.querySelector(".joystick-thumb");
 
 progress.style.width = "18%";
 loadingStatus.textContent = "Creating landscape…";
@@ -341,12 +343,30 @@ let verticalVelocity=0;let jumpQueued=false;let suspensionImpact=0;const groundY
 const carVelocity=new THREE.Vector3();
 addEventListener("keydown",e=>{const key=e.key.toLowerCase();if(key===" "&&!keys[" "]){jumpQueued=true}keys[key]=true;if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(key))e.preventDefault();driving=true;intro.classList.add("hidden")});
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-document.querySelectorAll("[data-drive]").forEach(btn=>{
-  const k={forward:"w",backward:"s",left:"a",right:"d"}[btn.dataset.drive];
-  const on=e=>{e.preventDefault();keys[k]=true;driving=true;intro.classList.add("hidden")};
-  const off=e=>{e.preventDefault();keys[k]=false};
-  btn.addEventListener("pointerdown",on);btn.addEventListener("pointerup",off);btn.addEventListener("pointercancel",off);btn.addEventListener("pointerleave",off);
-});
+let joystickPointerId=null;
+function setJoystickKeys(event){
+  const rect=joystickRing.getBoundingClientRect();
+  const maxDistance=rect.width*.34;
+  const dx=event.clientX-(rect.left+rect.width/2);
+  const dy=event.clientY-(rect.top+rect.height/2);
+  const distance=Math.min(Math.hypot(dx,dy),maxDistance);
+  const angle=Math.atan2(dy,dx);
+  const thumbX=Math.cos(angle)*distance;
+  const thumbY=Math.sin(angle)*distance;
+  const horizontal=thumbX/maxDistance;
+  const vertical=-thumbY/maxDistance;
+  joystickThumb.style.transform=`translate(calc(-50% + ${thumbX}px), calc(-50% + ${thumbY}px))`;
+  keys.w=vertical>.18||(Math.abs(horizontal)>.25&&vertical>-.3);keys.s=vertical<-.35;keys.a=horizontal<-.18;keys.d=horizontal>.18;
+  if(Math.hypot(horizontal,vertical)>.18){driving=true;intro.classList.add("hidden")}
+}
+function releaseJoystick(){
+  joystickPointerId=null;keys.w=keys.s=keys.a=keys.d=false;
+  joystickThumb.style.transform="translate(-50%, -50%)";
+}
+joystickRing.addEventListener("pointerdown",event=>{event.preventDefault();joystickPointerId=event.pointerId;joystickRing.setPointerCapture(event.pointerId);setJoystickKeys(event)});
+joystickRing.addEventListener("pointermove",event=>{if(event.pointerId===joystickPointerId)setJoystickKeys(event)});
+joystickRing.addEventListener("pointerup",releaseJoystick);
+joystickRing.addEventListener("pointercancel",releaseJoystick);
 
 function resetCar(){car.position.set(-6,groundY,6);car.rotation.set(0,0,0);speed=0;steer=0;verticalVelocity=0;jumpQueued=false;suspensionImpact=0;}
 document.querySelector("#reset-car").addEventListener("click",resetCar);
