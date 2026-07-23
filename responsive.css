@@ -121,7 +121,7 @@
 .map-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 .legend-player { background: var(--blue); box-shadow: 0 0 0 2px rgba(18,136,255,.18); }
 .legend-point { background: #3e7c3a; }
-.legend-fountain { background: #55bce9; }
+.legend-intersection { background: #303b3d; border-radius: 2px !important; }
 
 .map-hint {
   margin: 12px 0 0;

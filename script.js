@@ -60,21 +60,25 @@ const mesh = (geometry, material, x=0, y=0, z=0) => { const m = new THREE.Mesh(g
 const CITY = {
   bounds: { minX: -70, maxX: 70, minZ: -58, maxZ: 58 },
   roads: [
-    [0, -50, 128, 8], [0, 50, 128, 8], [-64, 0, 8, 108], [64, 0, 8, 108],
-    [-36.5, 0, 8, 104], [7, -27, 8, 50], [7, -2, 8, 8], [7, 36, 8, 32],
-    [-50.25, 6, 27.5, 8], [7, -6, 100, 9], [7, 45, 100, 8]
+    // Wider perimeter avenues.
+    [0, -50, 128, 10], [0, 50, 128, 10], [-64, 0, 10, 110], [64, 0, 10, 110],
+    // Narrower connected city streets. The short Garage spur ends before
+    // the west avenue, and the former duplicate street at z=45 is gone.
+    [-36.5, 0, 8, 100],
+    // One wide main road replaces the two streets and green median.
+    [0, 2, 128, 22],
+    // Narrower north-south side road.
+    [8, 0, 8, 100],
+    // Full-width asphalt access apron directly in front of the Garage.
+    [-56, -6, 27, 16]
   ],
-  crosswalks: [
-    {x:-36.5,z:-6,orientation:"vertical"},{x:7,z:-6,orientation:"vertical"},{x:64,z:-6,orientation:"vertical"},
-    {x:7,z:-25,orientation:"horizontal"},{x:7,z:36,orientation:"horizontal"},{x:7,z:45,orientation:"horizontal"}
-  ],
-  plaza: { x: 8, z: 10, width: 18, depth: 16, fountainX: 8, fountainZ: 10 },
+  intersection: { x: 8, z: 2 },
   buildings: [
-    { id: "about", x: -16, z: -26, width: 27, depth: 22, height: 10, color: 0x91a5b7, mapColor: "#91a5b7", label: "ABOUT", subtitle: "Who I am and how I work" },
-    { id: "projects", x: 32, z: -26, width: 27, depth: 22, height: 10, color: 0x799b70, mapColor: "#799b70", label: "PROJECTS", subtitle: "Selected work · 2025—2026" },
-    { id: "experience", x: -16, z: 27, width: 27, depth: 22, height: 10, color: 0xb28a39, mapColor: "#b28a39", label: "EXPERIENCE", subtitle: "Experience and education" },
-    { id: "contact", x: 32, z: 27, width: 27, depth: 22, height: 10, color: 0x8c789a, mapColor: "#8c789a", label: "CONTACT", subtitle: "Let’s build something" },
-    { id: "home", x: -56, z: -25, width: 25, depth: 24, height: 10, color: 0x30343a, mapColor: "#30343a", label: "GARAGE", subtitle: "SPAWN" }
+    { id: "about", x: -16, z: -26, width: 27, depth: 22, height: 10, front: 1, color: 0x91a5b7, mapColor: "#91a5b7", label: "ABOUT", subtitle: "Who I am and how I work" },
+    { id: "projects", x: 32, z: -26, width: 27, depth: 22, height: 10, front: 1, color: 0x799b70, mapColor: "#799b70", label: "PROJECTS", subtitle: "Selected work · 2025—2026" },
+    { id: "experience", x: -16, z: 27, width: 27, depth: 22, height: 10, front: -1, color: 0xb28a39, mapColor: "#b28a39", label: "EXPERIENCE", subtitle: "Experience and education" },
+    { id: "contact", x: 32, z: 27, width: 27, depth: 22, height: 10, front: -1, color: 0x8c789a, mapColor: "#8c789a", label: "CONTACT", subtitle: "Let’s build something" },
+    { id: "home", x: -56, z: -25, width: 25, depth: 24, height: 10, front: 1, color: 0x30343a, mapColor: "#30343a", label: "GARAGE", subtitle: "SPAWN" }
   ]
 };
 const cameraOccluders = [];
@@ -94,11 +98,20 @@ addBoxCollider(0,CITY.bounds.minZ,140,2.4,1.2);addBoxCollider(0,CITY.bounds.maxZ
 
 const roadMat = mat(0x303a3e,.98);
 const curbMat = mat(0xb8b7a1,.82);
-const lineMat = new THREE.MeshBasicMaterial({color:0xf4f0d5});
+function roundedRoadSurface(x,z,width,depth,radius,material,y){
+  const w=width/2,d=depth/2,r=Math.min(radius,w,d);
+  const shape=new THREE.Shape();
+  shape.moveTo(-w+r,-d);
+  shape.lineTo(w-r,-d);shape.quadraticCurveTo(w,-d,w,-d+r);
+  shape.lineTo(w,d-r);shape.quadraticCurveTo(w,d,w-r,d);
+  shape.lineTo(-w+r,d);shape.quadraticCurveTo(-w,d,-w,d-r);
+  shape.lineTo(-w,-d+r);shape.quadraticCurveTo(-w,-d,-w+r,-d);
+  const surface=mesh(new THREE.ShapeGeometry(shape,4),material,x,y,z);
+  surface.rotation.x=-Math.PI/2;world.add(surface);
+}
 function roadBox(x,z,width,depth){
-  world.add(mesh(new THREE.BoxGeometry(width,.12,depth),roadMat,x,.06,z));
-  world.add(mesh(new THREE.BoxGeometry(width+.8,.12,depth+.8),curbMat,x,.025,z));
-  world.add(mesh(new THREE.BoxGeometry(width,.14,depth),roadMat,x,.085,z));
+  roundedRoadSurface(x,z,width+.8,depth+.8,2.2,curbMat,.15);
+  roundedRoadSurface(x,z,width,depth,1.8,roadMat,.18);
 }
 CITY.roads.forEach(([x,z,width,depth])=>roadBox(x,z,width,depth));
 const roadRects=CITY.roads;
@@ -112,19 +125,6 @@ function safeDecorPosition(x,z,clearance=2.2){
   }
   return [x,z];
 }
-for(const z of [-50,-6,45,50]) for(let x=-56;x<=56;x+=7) world.add(mesh(new THREE.BoxGeometry(3.4,.025,.14),lineMat,x,.18,z));
-for(const x of [-64,-36.5,64]) for(let z=-52;z<=52;z+=7) world.add(mesh(new THREE.BoxGeometry(.14,.025,3.4),lineMat,x,.18,z));
-for(let z=-52;z<=-3;z+=7) world.add(mesh(new THREE.BoxGeometry(.14,.025,3.4),lineMat,7,.18,z));
-for(let z=22;z<=52;z+=7) world.add(mesh(new THREE.BoxGeometry(.14,.025,3.4),lineMat,7,.18,z));
-world.add(mesh(new THREE.BoxGeometry(.14,.025,2.2),lineMat,7,.18,-1));
-CITY.crosswalks.forEach(({x,z,orientation})=>{
-  for(let i=-3;i<=3;i++){
-    const stripe=orientation === "vertical"
-      ? new THREE.BoxGeometry(1.1,.035,5.2)
-      : new THREE.BoxGeometry(5.2,.035,1.1);
-    world.add(mesh(stripe,lineMat,x+(orientation === "vertical" ? i*1.55 : 0),.2,z+(orientation === "vertical" ? 0 : i*1.55)));
-  }
-});
 function sidewalk(x,z,width,depth){world.add(mesh(new THREE.BoxGeometry(width,.16,depth),curbMat,x,.16,z));}
 
 const water = mesh(new THREE.CircleGeometry(280,128),new THREE.MeshPhysicalMaterial({color:0x5db9e8,roughness:.18,metalness:.08,transparent:true,opacity:.9}),0,-5,0);
@@ -141,8 +141,8 @@ function makeTextTexture(title, subtitle=""){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();return t;
 }
 
-function building(x,z,w,h,d,color,title,subtitle){
-  const g=new THREE.Group();g.position.set(x,0,z);
+function building(x,z,w,h,d,color,title,subtitle,front=1){
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=front < 0 ? Math.PI : 0;
   const body=mesh(new THREE.BoxGeometry(w,h,d),mat(color,.68),0,h/2,0);g.add(body);
   const roof=mesh(new THREE.BoxGeometry(w+.5,.35,d+.5),mat(0xffffff,.65),0,h+.15,0);g.add(roof);
   const glass=mat(0x7fc6f2,.18,.25);
@@ -150,49 +150,68 @@ function building(x,z,w,h,d,color,title,subtitle){
     const win=mesh(new THREE.BoxGeometry(1.3,1.25,.08),glass,xx,yy,d/2+.05);g.add(win);
   }
   const sign=mesh(new THREE.PlaneGeometry(Math.min(w*.82,11),Math.min(w*.82,11)/2),new THREE.MeshBasicMaterial({map:makeTextTexture(title,subtitle)}),0,h+2.1,d/2+.03);
-  const entrance=mesh(new THREE.BoxGeometry(3.2,.15,2.4),curbMat,0,.1,d/2+1.4);g.add(entrance);
   g.add(sign);shadow(g);world.add(g);cameraOccluders.push(g);addBoxCollider(x,z,w,d,1.2);return g;
 }
 
-CITY.buildings.forEach(({x,z,width,depth,height,color,label,subtitle})=>building(x,z,width,height,depth,color,label,subtitle));
-CITY.buildings.forEach(({x,z,width,depth})=>{
-  // Keep a measured green setback between every sidewalk edge and the road curb.
+CITY.buildings.forEach(({x,z,width,depth,height,color,label,subtitle,front})=>building(x,z,width,height,depth,color,label,subtitle,front));
+CITY.buildings.forEach(({id,x,z,width,depth,front})=>{
+  if(id === "home"){
+    // Keep the Garage's side/rear edging, but leave its entire front open
+    // so the asphalt access apron reaches the doors without a curb crossing.
+    sidewalk(x-width/2-0.6,z,1.2,depth+2.4);
+    sidewalk(x+width/2+0.6,z,1.2,depth+2.4);
+    sidewalk(x,z-depth/2-0.6,width,1.2);
+    return;
+  }
+  // Keep a measured green setback between every other building and the road curb.
   sidewalk(x,z,width+2.4,depth+2.4);
-  world.add(mesh(new THREE.BoxGeometry(4,.17,3.2),curbMat,x,.18,z+depth/2+2.7));
+  // Shared entrance template: sidewalk → terrace → interaction ring → door.
+  world.add(mesh(new THREE.BoxGeometry(7,.18,7),curbMat,x,.17,z+front*(depth/2+3.5)));
 });
 const garage = CITY.buildings.find(building => building.id === "home");
 const spawnZ=garage.z+garage.depth/2+7;
-world.add(mesh(new THREE.BoxGeometry(14,.08,14),new THREE.MeshStandardMaterial({color:0x59605f,roughness:.9}),garage.x,.22,spawnZ));
-world.add(mesh(new THREE.BoxGeometry(.18,.04,12),new THREE.MeshBasicMaterial({color:0xd6ae36}),garage.x-6.5,.28,spawnZ));
-world.add(mesh(new THREE.BoxGeometry(.18,.04,12),new THREE.MeshBasicMaterial({color:0xd6ae36}),garage.x+6.5,.28,spawnZ));
-world.add(mesh(new THREE.BoxGeometry(13,.04,.18),new THREE.MeshBasicMaterial({color:0xd6ae36}),garage.x,.28,spawnZ-6));
 
 function bench(x,z,rotation=0){const [safeX,safeZ]=safeDecorPosition(x,z,2.5);const g=new THREE.Group();g.position.set(safeX,.2,safeZ);g.rotation.y=rotation;g.add(mesh(new THREE.BoxGeometry(2.8,.22,.5),mat(0x85512e,.8),0,1,0));g.add(mesh(new THREE.BoxGeometry(2.8,.18,.5),mat(0x85512e,.8),0,.35,0));g.add(mesh(new THREE.BoxGeometry(.16,.8,.4),mat(0x303536,.7),-.95,.4,0));g.add(mesh(new THREE.BoxGeometry(.16,.8,.4),mat(0x303536,.7),.95,.4,0));shadow(g);world.add(g);addBoxCollider(safeX,safeZ,3,1.4,1);}
 function tree(x,z,s=1){const [safeX,safeZ]=safeDecorPosition(x,z,2.6*s);const g=new THREE.Group();g.position.set(safeX,0,safeZ);g.add(mesh(new THREE.CylinderGeometry(.28*s,.42*s,2.4*s,8),mat(0x76533b),0,1.2*s,0));const leaves=mat(Math.random()>.5?0x4f9e57:0x65ad5f,.9);g.add(mesh(new THREE.IcosahedronGeometry(1.5*s,1),leaves,0,3.2*s,0));g.add(mesh(new THREE.IcosahedronGeometry(1.1*s,1),leaves,.7*s,3.1*s,.3*s));shadow(g);world.add(g);addCircleCollider(safeX,safeZ,1.2*s);}
 [
   [-55,-45,1.1],[-42,-45,.8],[-8,-45,.7],[18,-45,.9],[51,-45,1.1],[-55,45,1.1],[-40,45,.8],[0,45,.9],[42,45,1.1],[56,37,.8],
-  [-31,-17,.75],[-3,-17,.7],[42,-17,.8],[-31,17,.8],[-3,17,.7],[42,17,.8],[-55,20,.8],[56,-18,.9],[56,12,.8]
+  [-31,-17,.75],[-3,-17,.7],[42,-17,.8],[-31,17,.8],[-3,17,.7],[42,17,.8],[56,-18,.9],[56,12,.8]
 ].forEach(([x,z,s])=>tree(x,z,s));
 function lamp(x,z){const [safeX,safeZ]=safeDecorPosition(x,z,1.8);const g=new THREE.Group();g.position.set(safeX,0,safeZ);g.add(mesh(new THREE.CylinderGeometry(.07,.11,3.2,8),mat(0x263b4d,.4,.7),0,1.6,0));g.add(mesh(new THREE.SphereGeometry(.25,12,8),new THREE.MeshStandardMaterial({color:0xffe9ac,emissive:0xffc85c,emissiveIntensity:2}),0,3.25,0));world.add(g);addCircleCollider(safeX,safeZ,.55);}
-[-52,-43,-27,-15,20,38,53].forEach(x=>{lamp(x,-37);lamp(x,37);});[-30,-14,14,30].forEach(z=>{lamp(-52,z);lamp(53,z);});
+[-52,-43,-27,-15,20,38,53].forEach(x=>lamp(x,-37));
+[-52,-43,-27,20,53].forEach(x=>lamp(x,37));
+[-30,-14,14,30].forEach(z=>{lamp(-52,z);lamp(53,z);});
 bench(-47,-44);bench(-2,-44);bench(48,-44);bench(-2,43);bench(48,43);
 
-const parkPath=mat(0xb49b70,.9);world.add(mesh(new THREE.BoxGeometry(CITY.plaza.width,.12,CITY.plaza.depth),parkPath,CITY.plaza.x,.08,CITY.plaza.z));
-world.add(mesh(new THREE.BoxGeometry(CITY.plaza.width,.14,3),mat(0xc3a878,.9),CITY.plaza.x,.18,CITY.plaza.z));
-world.add(mesh(new THREE.BoxGeometry(3,.14,CITY.plaza.depth),mat(0xc3a878,.9),CITY.plaza.x,.18,CITY.plaza.z));
-const fountain=new THREE.Group();fountain.position.set(CITY.plaza.fountainX,.2,CITY.plaza.fountainZ);fountain.add(mesh(new THREE.CylinderGeometry(5,5.5,.45,8),mat(0x838b91,.5,.25),0,.2,0));fountain.add(mesh(new THREE.CylinderGeometry(3.8,3.8,.12,32),new THREE.MeshPhysicalMaterial({color:0x55bce9,roughness:.08,metalness:.2}),0,.48,0));fountain.add(mesh(new THREE.CylinderGeometry(.65,.9,1.7,8),mat(0x8d989e,.5,.3),0,1.2,0));fountain.add(mesh(new THREE.SphereGeometry(.5,16,10),new THREE.MeshPhysicalMaterial({color:0x55bce9,emissive:0x176fa1,emissiveIntensity:.4}),0,2.15,0));shadow(fountain);world.add(fountain);addCircleCollider(CITY.plaza.fountainX,CITY.plaza.fountainZ,5.5);
+function trafficLight(x,z,rotation=0){
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rotation;
+  const dark=mat(0x263238,.55,.35);
+  g.add(mesh(new THREE.CylinderGeometry(.11,.15,3.5,8),dark,0,1.75,0));
+  g.add(mesh(new RoundedBoxGeometry(.72,1.8,.52,3,.12),dark,0,3.45,0));
+  [
+    [.53,0xe34b3f,1.8],[0,0xf2b735,.35],[-.53,0x58a95c,.28]
+  ].forEach(([y,color,intensity])=>{
+    const light=mesh(new THREE.SphereGeometry(.19,12,8),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:intensity,roughness:.3}),0,3.45+y,-.29);
+    g.add(light);
+  });
+  shadow(g);world.add(g);addCircleCollider(x,z,.45);
+}
+trafficLight(2,-11,Math.PI/2);
+trafficLight(14,15,-Math.PI/2);
+trafficLight(14,-11,0);
+trafficLight(2,15,Math.PI);
 // Interactive area markers
 const zones=[...CITY.buildings.filter(building=>building.id === "home"),...CITY.buildings.filter(building=>building.id !== "home")].map(building=>({
   id:building.id,
   label:building.id === "home" ? "Garage" : building.label[0] + building.label.slice(1).toLowerCase(),
-  // Keep the interaction/menu marker behind each building so it does not sit
-  // on the visible road or block the front entrance. Garage remains at spawn.
-  pos:new THREE.Vector3(building.x,0,building.z + (building.id === "home" ? building.depth / 2 + 7 : -building.depth / 2 - 2)),
+  // Every portfolio building uses the same front-door interaction position.
+  // Garage remains at its unchanged spawn point.
+  pos:new THREE.Vector3(building.x,0,building.z + (building.id === "home" ? building.depth / 2 + 7 : building.front*(building.depth / 2 + 3.5))),
   radius:building.id === "home" ? 6 : 8
 }));
-zones.slice(1).forEach((zone,i)=>{
-  const ring=mesh(new THREE.RingGeometry(3.1,3.35,48),new THREE.MeshBasicMaterial({color:0x1688ff,transparent:true,opacity:.72,side:THREE.DoubleSide}),zone.pos.x,.2,zone.pos.z);ring.rotation.x=-Math.PI/2;world.add(ring);
-  const beam=mesh(new THREE.CylinderGeometry(2.9,2.9,5.5,32,1,true),new THREE.MeshBasicMaterial({color:0x48a6ff,transparent:true,opacity:.075,side:THREE.DoubleSide}),zone.pos.x,2.8,zone.pos.z);world.add(beam);
+zones.filter(zone=>zone.id !== "home").forEach(zone=>{
+  const ring=mesh(new THREE.RingGeometry(2.05,2.3,48),new THREE.MeshBasicMaterial({color:0x1688ff,transparent:true,opacity:.82,side:THREE.DoubleSide}),zone.pos.x,.285,zone.pos.z);ring.rotation.x=-Math.PI/2;world.add(ring);
+  const beam=mesh(new THREE.CylinderGeometry(1.9,1.9,5.5,32,1,true),new THREE.MeshBasicMaterial({color:0x48a6ff,transparent:true,opacity:.075,side:THREE.DoubleSide}),zone.pos.x,2.8,zone.pos.z);world.add(beam);
 });
 
 // Drivable car
@@ -530,16 +549,8 @@ function drawMap(){
   for(let x=minX;x<maxX;x+=4)for(let z=minZ;z<maxZ;z+=4){const n=(Math.sin(x*17.13+z*5.71)*43758.5453)%1;mapContext.fillStyle=n>.52?"rgba(218,235,126,.2)":"rgba(37,91,48,.12)";mapContext.fillRect(px(x+Math.abs(n)*2),py(z+Math.abs(n)*2),Math.max(1,scale*.7),Math.max(1,scale*.7))}
   const rounded=(x,z,w,d,r,fill,stroke)=>{const left=px(x-w/2),top=py(z-d/2),width=w*scale,height=d*scale;mapContext.beginPath();mapContext.roundRect(left,top,width,height,r*scale);mapContext.fillStyle=fill;mapContext.fill();if(stroke){mapContext.strokeStyle=stroke;mapContext.lineWidth=Math.max(1,scale);mapContext.stroke()}};
   const roadRect=(x,z,w,d)=>{rounded(x+1,z+1,w,d,2,"rgba(13,35,31,.24)");rounded(x,z,w,d,2,"#b5b4a2");rounded(x,z,w-2.2,d-2.2,1.6,"#303b3d")};
-  // Keep a single perimeter road on the far right; the inner x=51 lane
-  // beside Projects/Contact is intentionally omitted.
-  rounded(0,0,136,108,7,"#b5b4a2");rounded(0,0,132,104,5,"#303b3d");rounded(0,0,124,96,3,"#6e9e50");
-  CITY.roads.slice(4).forEach(([x,z,w,d])=>roadRect(x,z,w,d));
-  const centerLine=(x1,z1,x2,z2)=>{mapContext.save();mapContext.strokeStyle="rgba(245,241,216,.92)";mapContext.lineWidth=Math.max(1,scale*.75);mapContext.setLineDash([5*scale,6*scale]);mapContext.beginPath();mapContext.moveTo(px(x1),py(z1));mapContext.lineTo(px(x2),py(z2));mapContext.stroke();mapContext.restore()};
-  centerLine(-62,-50,62,-50);centerLine(-62,50,62,50);centerLine(-64,-6,64,-6);centerLine(-36.5,-51,-36.5,51);centerLine(64,-51,64,51);centerLine(7,-51,7,-11);centerLine(7,-6,7,1);centerLine(7,20,7,51);centerLine(-63,6,-37,6);
-  CITY.crosswalks.forEach(({x,z,orientation})=>{for(let i=-3;i<=3;i++){mapContext.fillStyle="#f6f2d9";if(orientation==="vertical")mapContext.fillRect(px(x-4.6+i*1.45),py(z-3),1.1*scale,6*scale);else mapContext.fillRect(px(x-3),py(z-4.6+i*1.45),6*scale,1.1*scale)}});
-  const plaza=CITY.plaza;rounded(plaza.x,plaza.z,plaza.width+4,plaza.depth+4,2,"rgba(35,65,35,.25)");rounded(plaza.x,plaza.z,plaza.width,plaza.depth,1,"#b49b70","#e1d0ad");mapContext.fillStyle="#c9ad7d";mapContext.fillRect(px(plaza.x-plaza.width/2),py(plaza.z-1.5),plaza.width*scale,3*scale);mapContext.fillRect(px(plaza.x-1.5),py(plaza.z-plaza.depth/2),3*scale,plaza.depth*scale);
-  mapContext.fillStyle="#55bce9";mapContext.beginPath();mapContext.arc(px(plaza.fountainX),py(plaza.fountainZ),Math.max(5,4.2*scale),0,Math.PI*2);mapContext.fill();mapContext.strokeStyle="#eef8ff";mapContext.lineWidth=2;mapContext.stroke();mapContext.fillStyle="#687d86";mapContext.beginPath();mapContext.arc(px(plaza.fountainX),py(plaza.fountainZ),Math.max(2,1.1*scale),0,Math.PI*2);mapContext.fill();
-  const trees=[[-56,-42,2.5],[-48,-42,1.8],[-4,-42,1.7],[42,-42,2.2],[56,-42,2.5],[-56,42,2.2],[-48,42,1.8],[-2,42,2],[43,42,2.2],[56,42,1.8],[-55,16,2.1],[-28,-15,1.7],[-2,-15,1.5],[-28,17,1.7],[-2,18,1.5],[57,-15,1.8],[57,17,1.8],[19,21,1.5]];
+  CITY.roads.forEach(([x,z,w,d])=>roadRect(x,z,w,d));
+  const trees=[[-56,-42,2.5],[-48,-42,1.8],[-4,-42,1.7],[42,-42,2.2],[56,-42,2.5],[-56,42,2.2],[-48,42,1.8],[-2,42,2],[43,42,2.2],[56,42,1.8],[-28,-15,1.7],[-2,-15,1.5],[-28,17,1.7],[-2,18,1.5],[57,-15,1.8],[57,17,1.8],[19,21,1.5]];
   trees.forEach(([x,z,r])=>{mapContext.fillStyle="rgba(20,56,31,.3)";mapContext.beginPath();mapContext.arc(px(x)+2,py(z)+3,r*scale,0,Math.PI*2);mapContext.fill();mapContext.fillStyle="#3f843d";mapContext.beginPath();mapContext.arc(px(x),py(z),r*scale,0,Math.PI*2);mapContext.fill();mapContext.fillStyle="#72ae43";mapContext.beginPath();mapContext.arc(px(x-r*.25),py(z-r*.28),r*.42*scale,0,Math.PI*2);mapContext.fill()});
   const lamps=[[-42,-42],[-29,-8],[0,-8],[43,-8],[57,-42],[-42,42],[0,42],[43,42],[-5,8],[19,8],[19,22]];
   lamps.forEach(([x,z])=>{mapContext.fillStyle="#172c2e";mapContext.fillRect(px(x)-1,py(z)-5,2,9);mapContext.fillStyle="#ffd766";mapContext.beginPath();mapContext.arc(px(x),py(z)-6,2.2,0,Math.PI*2);mapContext.fill()});
@@ -547,13 +558,20 @@ function drawMap(){
   benches.forEach(([x,z])=>{mapContext.fillStyle="#70462b";mapContext.fillRect(px(x)-5,py(z)-1.5,10,2);mapContext.fillRect(px(x)-4,py(z)+2,2,2);mapContext.fillRect(px(x)+2,py(z)+2,2,2)});
   CITY.buildings.forEach(building=>{
     const left=px(building.x-building.width/2),top=py(building.z-building.depth/2),width=building.width*scale,height=building.depth*scale;
-    rounded(building.x,building.z,building.width+5,building.depth+5,2,"rgba(22,48,32,.3)");rounded(building.x,building.z,building.width+3,building.depth+3,2,"#d3d0bc");rounded(building.x,building.z,building.width,building.depth,2,building.mapColor,"#f1f0d9");
+    if(building.id !== "home"){
+      rounded(building.x,building.z,building.width+5,building.depth+5,2,"rgba(22,48,32,.3)");
+      rounded(building.x,building.z,building.width+3,building.depth+3,2,"#d3d0bc");
+      rounded(building.x,building.z+building.front*(building.depth/2+3.5),7,7,.6,"#d3d0bc");
+    }
+    rounded(building.x,building.z,building.width,building.depth,2,building.mapColor,"#f1f0d9");
     mapContext.fillStyle="rgba(255,255,255,.18)";mapContext.fillRect(left+width*.12,top+height*.14,width*.76,height*.08);
     mapContext.fillStyle="#fff";mapContext.font=`800 ${Math.max(8,Math.min(14,size*.022))}px Manrope, sans-serif`;mapContext.textAlign="center";mapContext.textBaseline="middle";mapContext.fillText(building.label,px(building.x),py(building.z));
-    mapContext.fillStyle="#6c8794";for(let i=-1;i<=1;i++)mapContext.fillRect(px(building.x+i*6)-2,py(building.z+building.depth/2-2),4,2);
+    mapContext.fillStyle="#6c8794";for(let i=-1;i<=1;i++)mapContext.fillRect(px(building.x+i*6)-2,py(building.z+building.front*(building.depth/2-2)),4,2);
+    if(building.id !== "home"){
+      mapContext.strokeStyle="#1688ff";mapContext.lineWidth=Math.max(1.5,scale*.7);
+      mapContext.beginPath();mapContext.arc(px(building.x),py(building.z+building.front*(building.depth/2+3.5)),2.3*scale,0,Math.PI*2);mapContext.stroke();
+    }
   });
-  // Garage has the larger footprint and a clearly marked spawn bay below it.
-  mapContext.fillStyle="#59605f";mapContext.fillRect(px(garage.x-7),py(spawnZ-7),14*scale,14*scale);mapContext.strokeStyle="#e0b93f";mapContext.lineWidth=2;mapContext.strokeRect(px(garage.x-6),py(spawnZ-6),12*scale,12*scale);mapContext.fillStyle="#e0b93f";mapContext.font=`800 ${Math.max(7,size*.016)}px sans-serif`;mapContext.fillText("SPAWN",px(garage.x),py(spawnZ));
   if(mapMarker.x===null){mapMarker.x=car.position.x;mapMarker.z=car.position.z;mapMarker.rotation=car.rotation.y}
   const targetX=car.position.x,targetZ=car.position.z,targetRotation=car.rotation.y;
   mapMarker.x=THREE.MathUtils.lerp(mapMarker.x,targetX,.22);mapMarker.z=THREE.MathUtils.lerp(mapMarker.z,targetZ,.22);mapMarker.rotation=THREE.MathUtils.lerp(mapMarker.rotation,targetRotation,.22);
