@@ -40,7 +40,8 @@ window.portfolio = {
   email: "alghazalidimas011@gmail.com",
   socials: [
     { label: "Email", url: "mailto:alghazalidimas011@gmail.com" },
-    { label: "GitHub", url: "https://github.com/" },
-    { label: "LinkedIn", url: "https://linkedin.com/" }
+    { label: "LinkedIn", url: "https://www.linkedin.com/in/dimasalgazali-profile240605" },
+    { label: "GitHub", url: "https://github.com/Dimas2406" },
+    { label: "Instagram", url: "", pending: true }
   ]
 };
